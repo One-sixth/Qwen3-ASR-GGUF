@@ -10,22 +10,29 @@ sys.path.append(str(Path(__file__).parent.absolute()))
 
 from qwen_asr_gguf.inference import QwenASREngine, itn, load_audio, ASREngineConfig, AlignerConfig
 from qwen_asr_gguf.inference import exporters
+from export_config import QUANTIZE_TYPE, ENC_QUANTIZE_TYPE, EXPORT_DIR
 
 def main():
-    
-    audio_path = "睡前消息.m4a"
-    context = "这是1004期睡前消息，主持人叫督工，助理叫静静。"
+
+    audio_path = "test_audio/asr_zh.aac"
+    context = ""
 
     # 配置引擎
     config = ASREngineConfig(
-        model_dir="model",
+        encoder_frontend_fn=f"qwen3_asr_encoder_frontend.{ENC_QUANTIZE_TYPE}.onnx",
+        encoder_backend_fn=f"qwen3_asr_encoder_backend.{ENC_QUANTIZE_TYPE}.onnx",
+        llm_fn = f"qwen3_asr_llm.{QUANTIZE_TYPE}.gguf",
+        model_dir=EXPORT_DIR,
         onnx_provider = 'DML',
         llm_use_gpu = True,
-        enable_aligner = True, 
+        enable_aligner = True,
         align_config = AlignerConfig(
-            onnx_provider='DML', 
+            encoder_frontend_fn=f"qwen3_aligner_encoder_frontend.{ENC_QUANTIZE_TYPE}.onnx",
+            encoder_backend_fn=f"qwen3_aligner_encoder_backend.{ENC_QUANTIZE_TYPE}.onnx",
+            onnx_provider='DML',
             llm_use_gpu=True,
-            model_dir="model", 
+            model_dir=EXPORT_DIR,
+            llm_fn=f"qwen3_aligner_llm.{QUANTIZE_TYPE}.gguf"
         )
     )
 
@@ -33,17 +40,18 @@ def main():
     t0 = time.time()
     engine = QwenASREngine(config=config)
     print(f"--- [QwenASR] 引擎初始化耗时: {time.time() - t0:.2f} 秒 ---")
-    
+
     # 执行转录
     res = engine.transcribe(
         audio_file=audio_path,
         context=context,
-        language="Chinese",
+        # language="Chinese",
+        language="",
         start_second=0,
         duration=40
     )
-    
-    
+
+
     # 导出文本（每行一句）
     txt_path = str(Path(audio_path).with_suffix('.txt'))
     exporters.export_to_txt(txt_path, res)
@@ -62,7 +70,7 @@ def main():
         for it in res.alignment.items[:10]:
             print(f"{it.text:<10} | {it.start_time:7.3f}s | {it.end_time:7.3f}s")
         print("="*52)
-    
+
     # 优雅退出
     engine.shutdown()
 

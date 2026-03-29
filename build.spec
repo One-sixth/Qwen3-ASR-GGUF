@@ -19,6 +19,7 @@ datas = []
 
 # 隐藏导入 - 确保所有需要的模块都被包含
 hiddenimports += [
+    'encodings',
     'rich',
     'rich.console',
     'rich.markdown',
@@ -38,7 +39,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=['build_hook.py'],
-    excludes=['torch', 'transformers', ],
+    excludes=['torch', 'transformers', 'PySide6', 'shiboken6', 'pythonnet', 'apache_iotdb', 'IPython', 'pyarrow', 'scipy'],
     noarchive=False,
     optimize=0,
 )
@@ -46,7 +47,7 @@ a = Analysis(
 
 
 # 排除不要打包的模块（这些将作为源文件复制）
-private_module = ['qwen_asr_gguf', 
+private_module = ['qwen_asr_gguf',
                   ]
 pure = a.pure.copy()
 a.pure.clear()
@@ -79,7 +80,7 @@ exe = EXE(
     entitlements_file=None,
 
     # 所有第三方依赖放入 internal 目录
-    contents_directory = 'internal', 
+    contents_directory = 'internal',
     icon = 'assets/icon.ico'
 )
 

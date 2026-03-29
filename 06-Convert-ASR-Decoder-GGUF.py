@@ -2,12 +2,13 @@ import sys
 import os
 import json
 from pathlib import Path
+from export_config import EXPORT_DIR
 
 # 1. 路径设置
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 CONVERT_LIB_DIR = os.path.join(PROJECT_ROOT, "qwen_asr_gguf", 'export')
-MODEL_DIR = os.path.join(PROJECT_ROOT, "model", "asr_decoder_hf")
-OUTPUT_GGUF = os.path.join(PROJECT_ROOT, "model", "qwen3_asr_llm.gguf")
+MODEL_DIR = os.path.join(EXPORT_DIR, "asr_decoder_hf")
+OUTPUT_GGUF = os.path.join(EXPORT_DIR, "qwen3_asr_llm.gguf")
 
 # 确保可以导入转换库
 if CONVERT_LIB_DIR not in sys.path:
@@ -27,16 +28,16 @@ def patched_load_hparams(dir_model: Path, is_mistral_format: bool):
     直接从磁加载 config.json，绕过 AutoConfig 的“张冠李戴”问题。
     """
     print(f"💉 [补丁] 拦截 load_hparams。正在从 {dir_model / 'config.json'} 加载...")
-    
+
     with open(dir_model / "config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-    
+
     # 转换器内部 normalization
     if "llm_config" in config:
         config["text_config"] = config["llm_config"]
     if "thinker_config" in config:
         config["text_config"] = config["thinker_config"]["text_config"]
-        
+
     return config
 
 def patched_get_vocab_base_pre(self, tokenizer) -> str:

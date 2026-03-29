@@ -7,36 +7,40 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.absolute()))
 
 from qwen_asr_gguf.inference import QwenForcedAligner, load_audio, AlignerConfig
+from export_config import QUANTIZE_TYPE, ENC_QUANTIZE_TYPE, EXPORT_DIR
 
 def main():
     # 路径配置
-    model_dir = "model"
-    audio_path = "test.mp3"
-    text_path = "test.txt"
-    
+    model_dir = EXPORT_DIR
+    audio_path = "test_audio/asr_zh.aac"
+    text_path = "test_audio/asr_zh.txt"
+
     if not os.path.exists(text_path):
         print(f"❌ 找不到文本文件: {text_path}")
         return
-        
+
     with open(text_path, "r", encoding="utf-8") as f:
         text = f.read().strip()
 
     # 1. 初始化对齐器 (使用标准化 Config)
     # 默认会自动加载 Split Encoder (frontend/backend)
     config = AlignerConfig(
-        model_dir="model", 
+        encoder_frontend_fn=f"qwen3_aligner_encoder_frontend.{ENC_QUANTIZE_TYPE}.onnx",
+        encoder_backend_fn=f"qwen3_aligner_encoder_backend.{ENC_QUANTIZE_TYPE}.onnx",
+        model_dir=model_dir,
         onnx_provider='DML',
-        llm_use_gpu=True
+        llm_use_gpu=True,
+        llm_fn=f"qwen3_aligner_llm.{QUANTIZE_TYPE}.gguf"
     )
     aligner = QwenForcedAligner(config=config)
-    
+
     # 2. 加载音频 (基于 pydub)
     print(f"加载音频: {audio_path}")
     audio = load_audio(audio_path)
-    
+
     # 3. 执行对齐 (标准化结果)
     results = aligner.align(audio, text)
-    
+
     # 4. 输出对齐预览
     print("\n" + "="*50)
     print(f"{'Text':<20} | {'Start':<8} | {'End':<8}")

@@ -321,6 +321,7 @@ class Qwen3ASRThinkerConfig(PretrainedConfig):
     model_type = "qwen3_asr_thinker"
 
     attribute_map = {}
+    pad_token_id = None
     sub_configs = {
         "audio_config": Qwen3ASRAudioEncoderConfig,
         "text_config": Qwen3ASRTextConfig,
@@ -400,12 +401,13 @@ class Qwen3ASRConfig(PretrainedConfig):
         support_languages=None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
         if thinker_config is None:
             thinker_config = {}
 
         self.thinker_config = Qwen3ASRThinkerConfig(**thinker_config)
         self.support_languages = support_languages
+        # tf 5 以后，super().__init__ 过程中会调用 get_text_config，造成错误，延迟可以避免该错误
+        super().__init__(**kwargs)
 
     def get_text_config(self, decoder=False) -> "PretrainedConfig":
         """

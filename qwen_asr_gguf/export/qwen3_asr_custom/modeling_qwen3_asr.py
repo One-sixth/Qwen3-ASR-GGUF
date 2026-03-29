@@ -38,7 +38,7 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.utils import auto_docstring, can_return_tuple
 from transformers.utils.deprecation import deprecate_kwarg
-from transformers.utils.generic import TransformersKwargs, check_model_inputs
+from transformers.utils.generic import TransformersKwargs, merge_with_config_defaults
 
 from .configuration_qwen3_asr import (
     Qwen3ASRAudioEncoderConfig,
@@ -983,7 +983,7 @@ class Qwen3ASRThinkerTextModel(Qwen3ASRPreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-    @check_model_inputs()
+    @merge_with_config_defaults
     @auto_docstring
     def forward(
         self,
@@ -1118,7 +1118,7 @@ class Qwen3ASRThinkerForConditionalGeneration(Qwen3ASRPreTrainedModelForConditio
         else:
             audio_feature_lengths = None
         feature_lens = audio_feature_lengths if audio_feature_lengths is not None else feature_attention_mask.sum(-1)
-    
+
         # audio encoder do not support batch inference to keep precision
         audio_features = []
         for input_feature, feature_len in zip(input_features, feature_lens):
@@ -1317,7 +1317,7 @@ class Qwen3ASRForConditionalGeneration(Qwen3ASRPreTrainedModel, GenerationMixin)
 
         self.thinker = Qwen3ASRThinkerForConditionalGeneration._from_config(config.thinker_config)
         self.post_init()
-    
+
     def get_support_languages(self):
         return self.config.support_languages
 

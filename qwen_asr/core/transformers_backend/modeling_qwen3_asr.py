@@ -38,7 +38,7 @@ from transformers.modeling_utils import ALL_ATTENTION_FUNCTIONS, PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.utils import auto_docstring, can_return_tuple
 from transformers.utils.deprecation import deprecate_kwarg
-from transformers.utils.generic import TransformersKwargs, check_model_inputs
+from transformers.utils.generic import TransformersKwargs, merge_with_config_defaults
 
 from .configuration_qwen3_asr import (
     Qwen3ASRAudioEncoderConfig,
@@ -724,11 +724,15 @@ class Qwen3ASRAudioEncoder(Qwen3ASRPreTrainedModel):
             if remainder != 0:
                 cu_chunk_lens += [remainder]
         cu_seqlens = torch.tensor(cu_chunk_lens, device=aftercnn_lens.device).cumsum(-1, dtype=torch.int32)
+        # Build block-diagonal attention mask for non-FA2 backends (SDPA, eager).                                                                                                                                                           
+        # FA2 uses cu_seqlens natively; _prepare_attention_mask returns None for FA2.                                                                                                                                                       
+        attention_mask = self._prepare_attention_mask(hidden_states, cu_seqlens)                                                                                                                                                            
 
         for encoder_layer in self.layers:
             layer_outputs = encoder_layer(
                 hidden_states,
                 cu_seqlens,
+                attention_mask=attention_mask,                                                                                                                                                                                       
             )
 
             hidden_states = layer_outputs[0]
@@ -791,13 +795,23 @@ class Qwen3ASRThinkerTextRotaryEmbedding(nn.Module):
         self.original_max_seq_len = config.max_position_embeddings
 
         self.config = config
-        self.rope_init_fn = ROPE_INIT_FUNCTIONS[self.rope_type]
+        if self.rope_type == 'default':
+            self.rope_init_fn = self.compute_default_rope_parameters
+        else:
+            self.rope_init_fn = ROPE_INIT_FUNCTIONS[self.rope_type]
 
         inv_freq, self.attention_scaling = self.rope_init_fn(self.config, device)
         self.register_buffer("inv_freq", inv_freq, persistent=False)
         self.original_inv_freq = self.inv_freq
 
         self.mrope_section = config.rope_scaling.get("mrope_section", [24, 20, 20])
+
+    @staticmethod
+    def compute_default_rope_parameters(config, device=None, seq_len=None, **_kw):
+        base = getattr(config, "rope_theta", 10000.0)
+        dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
+        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2, dtype=torch.float32).to(device) / dim))
+        return inv_freq, 1.0
 
     def apply_interleaved_mrope(self, freqs, mrope_section):
         """Apply interleaved MRoPE to 3D rotary embeddings.
@@ -983,7 +997,7 @@ class Qwen3ASRThinkerTextModel(Qwen3ASRPreTrainedModel):
         # Initialize weights and apply final processing
         self.post_init()
 
-    @check_model_inputs()
+    @merge_with_config_defaults
     @auto_docstring
     def forward(
         self,
@@ -1026,7 +1040,7 @@ class Qwen3ASRThinkerTextModel(Qwen3ASRPreTrainedModel):
 
         attention_mask = create_causal_mask(
             config=self.config,
-            input_embeds=inputs_embeds,
+            inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
             cache_position=cache_position,
             past_key_values=past_key_values,

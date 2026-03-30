@@ -10,7 +10,7 @@ from export_config import EXPORT_DIR
 def convert_to_fp16(input_path):
     output_path = input_path.replace(".fp32.onnx", ".fp16.onnx")
     print(f"\n[FP16] Converting {os.path.basename(input_path)} -> {os.path.basename(output_path)}...")
-    
+
     try:
         model = onnx.load(input_path)
         # 使用 ORT Transformers 转换以获得更好的 DML 兼容性
@@ -21,7 +21,7 @@ def convert_to_fp16(input_path):
             keep_io_types=False,
             min_positive_val=1e-7,
             max_finite_val=65504,
-            op_block_list=['LayerNormalization'] 
+            op_block_list=['LayerNormalization']
         )
         onnx.save(model_fp16, output_path)
         print(f"   ✅ [Success] Saved FP16 model.")
@@ -31,7 +31,7 @@ def convert_to_fp16(input_path):
 def convert_to_int8(input_path):
     output_path = input_path.replace(".fp32.onnx", ".int8.onnx")
     print(f"\n[INT8] Quantizing {os.path.basename(input_path)} -> {os.path.basename(output_path)}...")
-    
+
     try:
         quantize_dynamic(
             input_path,
@@ -48,7 +48,7 @@ def convert_to_int8(input_path):
 def convert_to_int4(input_path):
     output_path = input_path.replace(".fp32.onnx", ".int4.onnx")
     print(f"\n[INT4] Quantizing {os.path.basename(input_path)} -> {os.path.basename(output_path)}...")
-    
+
     try:
         quantizer = MatMulNBitsQuantizer(
             model=input_path,
@@ -64,7 +64,7 @@ def convert_to_int4(input_path):
 
 def main():
     print("--- 正在开始针对 Qwen3-ASR Split Encoder 的批量量化/转换 ---")
-    
+
     export_path = Path(EXPORT_DIR)
     if not export_path.exists():
         print(f"错误: 目录 {export_path} 不存在。")
@@ -75,23 +75,23 @@ def main():
         "qwen3_asr_encoder_frontend.fp32.onnx",
         "qwen3_asr_encoder_backend.fp32.onnx"
     ]
-    
+
     for target in targets:
         model_path = str(export_path / target)
-        
+
         if not os.path.exists(model_path):
             print(f"\n❌ 跳过: 找不到基准 FP32 模型文件: {target}")
             continue
-            
+
         print(f"\n>>> 处理模型: {target}")
-        
-        # 1. 转换为 FP16 
+
+        # 1. 转换为 FP16
         convert_to_fp16(model_path)
-        
-        # 2. 动态量化为 INT8 
+
+        # 2. 动态量化为 INT8
         convert_to_int8(model_path)
-        
-        # 3. 权重量化为 INT4 
+
+        # 3. 权重量化为 INT4
         convert_to_int4(model_path)
 
     print("\n--- 所有转换工作已完成 ---")

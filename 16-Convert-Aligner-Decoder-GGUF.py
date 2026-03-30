@@ -3,11 +3,12 @@ import sys
 import os
 import json
 from pathlib import Path
+from export_config import EXPORT_DIR
 
 # 1. 路径设置
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 CONVERT_LIB_DIR = os.path.join(PROJECT_ROOT, "qwen_asr_gguf", 'export')
-MODEL_DIR = os.path.join(PROJECT_ROOT, "model", "aligner_decoder_hf")
+MODEL_DIR = os.path.join(EXPORT_DIR, "aligner_decoder_hf")
 
 # 确保可以导入转换库
 if CONVERT_LIB_DIR not in sys.path:
@@ -27,14 +28,14 @@ def patched_load_hparams(dir_model: Path, is_mistral_format: bool):
     直接从磁加载 config.json，绕过 AutoConfig 的加载问题。
     """
     print(f"💉 [补丁] 拦截 load_hparams。正在从 {dir_model / 'config.json'} 加载...")
-    
+
     with open(dir_model / "config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
-    
+
     # 针对对齐器模型的配置做归一化
     if "text_config" not in config:
         config["text_config"] = config
-        
+
     return config
 
 def patched_get_vocab_base_pre(self, tokenizer) -> str:

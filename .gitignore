@@ -1,0 +1,5 @@
+*.pyc
+*.log
+/model
+/qwen_asr_gguf/inference/bin
+/.idea

@@ -1,4 +1,4 @@
-transformers==4.57.6
+transformers~=5.4.0
 onnxruntime-directml
 gguf
 torch

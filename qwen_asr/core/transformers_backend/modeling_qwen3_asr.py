@@ -724,15 +724,15 @@ class Qwen3ASRAudioEncoder(Qwen3ASRPreTrainedModel):
             if remainder != 0:
                 cu_chunk_lens += [remainder]
         cu_seqlens = torch.tensor(cu_chunk_lens, device=aftercnn_lens.device).cumsum(-1, dtype=torch.int32)
-        # Build block-diagonal attention mask for non-FA2 backends (SDPA, eager).                                                                                                                                                           
-        # FA2 uses cu_seqlens natively; _prepare_attention_mask returns None for FA2.                                                                                                                                                       
-        attention_mask = self._prepare_attention_mask(hidden_states, cu_seqlens)                                                                                                                                                            
+        # Build block-diagonal attention mask for non-FA2 backends (SDPA, eager).
+        # FA2 uses cu_seqlens natively; _prepare_attention_mask returns None for FA2.
+        attention_mask = self._prepare_attention_mask(hidden_states, cu_seqlens)
 
         for encoder_layer in self.layers:
             layer_outputs = encoder_layer(
                 hidden_states,
                 cu_seqlens,
-                attention_mask=attention_mask,                                                                                                                                                                                       
+                attention_mask=attention_mask,
             )
 
             hidden_states = layer_outputs[0]
@@ -1132,7 +1132,7 @@ class Qwen3ASRThinkerForConditionalGeneration(Qwen3ASRPreTrainedModelForConditio
         else:
             audio_feature_lengths = None
         feature_lens = audio_feature_lengths if audio_feature_lengths is not None else feature_attention_mask.sum(-1)
-    
+
         # audio encoder do not support batch inference to keep precision
         audio_features = []
         for input_feature, feature_len in zip(input_features, feature_lens):
@@ -1183,7 +1183,7 @@ class Qwen3ASRThinkerForConditionalGeneration(Qwen3ASRPreTrainedModelForConditio
         rope_deltas=None,
         labels=None,
         use_cache=None,
-        cache_position=None,
+        # cache_position=None,
         **kwargs,
     ) -> Union[tuple, Qwen3ASRThinkerCausalLMOutputWithPast]:
         r"""
@@ -1221,25 +1221,28 @@ class Qwen3ASRThinkerForConditionalGeneration(Qwen3ASRPreTrainedModelForConditio
         else:
             audio_feature_lengths = None
 
-        if attention_mask is not None and position_ids is None:
-            if (
-                cache_position is None
-                or (cache_position is not None and cache_position[0] == 0)
-                or self.rope_deltas is None
-            ):
-                delta0 = (1 - attention_mask).sum(dim=-1).unsqueeze(1)
-                position_ids, rope_deltas = self.get_rope_index(
-                    attention_mask,
-                )
-                rope_deltas = rope_deltas - delta0
-                self.rope_deltas = rope_deltas
-            else:
-                batch_size, seq_length = input_ids.shape
-                delta = cache_position[0] + self.rope_deltas if cache_position is not None else 0
-                position_ids = torch.arange(seq_length, device=input_ids.device)
-                position_ids = position_ids.view(1, -1).expand(batch_size, -1)
-                position_ids = position_ids.add(delta)
-                position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
+        assert attention_mask is not None, 'attention_mask must be input'
+
+        if past_key_values is not None:
+            n_past = past_key_values.get_seq_length()
+        else:
+            n_past = 0
+
+        if n_past == 0:
+            delta0 = (1 - attention_mask).sum(dim=-1).unsqueeze(1)
+            position_ids, rope_deltas = self.get_rope_index(
+                attention_mask,
+            )
+            rope_deltas = rope_deltas - delta0
+            self.rope_deltas = rope_deltas
+        else:
+            batch_size, seq_length = input_ids.shape
+            # delta = cache_position[0] + self.rope_deltas if cache_position is not None else 0
+            delta = n_past + self.rope_deltas
+            position_ids = torch.arange(seq_length, device=input_ids.device)
+            position_ids = position_ids.view(1, -1).expand(batch_size, -1)
+            position_ids = position_ids.add(delta)
+            position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
 
         outputs = self.model(
             attention_mask=attention_mask,
@@ -1247,7 +1250,7 @@ class Qwen3ASRThinkerForConditionalGeneration(Qwen3ASRPreTrainedModelForConditio
             past_key_values=past_key_values,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
-            cache_position=cache_position,
+            # cache_position=cache_position,
             **kwargs,
         )
 
@@ -1297,7 +1300,7 @@ class Qwen3ASRThinkerForConditionalGeneration(Qwen3ASRPreTrainedModelForConditio
 
         model_inputs["position_ids"] = None
 
-        if cache_position[0] != 0:
+        if past_key_values is not None and past_key_values.get_seq_length() > 0:
             model_inputs["input_features"] = None
 
         return model_inputs
@@ -1331,7 +1334,7 @@ class Qwen3ASRForConditionalGeneration(Qwen3ASRPreTrainedModel, GenerationMixin)
 
         self.thinker = Qwen3ASRThinkerForConditionalGeneration._from_config(config.thinker_config)
         self.post_init()
-    
+
     def get_support_languages(self):
         return self.config.support_languages
 

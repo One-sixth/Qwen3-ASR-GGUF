@@ -24,7 +24,7 @@ from rich import print as rprint
 from qwen_asr_gguf.inference import QwenASREngine, ASREngineConfig, AlignerConfig, exporters
 
 # 用来做命令行参数的默认值
-from export_config import QUANTIZE_TYPE, ENC_QUANTIZE_TYPE
+from export_config import LLM_QUANTIZE_TYPE, ENC_QUANTIZE_TYPE
 
 app = typer.Typer(help="Qwen3-ASR GGUF 命令行转录工具", add_completion=False)
 console = Console()
@@ -80,8 +80,8 @@ def transcribe(
 
     # 组 1: 模型与硬件
     model_dir: str = typer.Option(str(PROJ_DIR / "model"), "--model-dir", "-m", help="模型权重根目录", rich_help_panel="模型配置"),
-    precision: str = typer.Option(ENC_QUANTIZE_TYPE, "--prec", help="编码器精度: fp32, fp16, int8, int4", rich_help_panel="模型配置"),
-    llm_precision: str = typer.Option(QUANTIZE_TYPE, "--llm-prec", help="LLM模型位数: q8_0, q6_k, q4_k", rich_help_panel="模型配置"),
+    enc_precision: str = typer.Option(ENC_QUANTIZE_TYPE, "--enc-prec", help="使用的编码器精度: 可选：fp16 int8 int4", rich_help_panel="模型配置"),
+    llm_precision: str = typer.Option(LLM_QUANTIZE_TYPE, "--llm-prec", help="使用的LLM模型精度，可选：f16 q8_0 q6_k q4_k", rich_help_panel="模型配置"),
     timestamp: bool = typer.Option(True, "--timestamp/--no-ts", help="是否开启时间戳引擎", rich_help_panel="模型配置"),
     onnx_provider: str = typer.Option("DML", "--provider", "-p", help="ONNX 执行后端: CPU, CUDA, DML, TRT", rich_help_panel="模型配置"),
     llm_use_gpu: bool = typer.Option(True, "--gpu/--no-gpu", help="LLM 是否使用 GPU 加速", rich_help_panel="模型配置"),
@@ -119,8 +119,8 @@ def transcribe(
         os.environ["VK_ICD_FILENAMES"] = "none"       # 禁止 Vulkan
 
     # 2. 构造配置
-    asr_files = get_model_filenames(precision, is_aligner=False)
-    align_files = get_model_filenames(precision, is_aligner=True)
+    asr_files = get_model_filenames(enc_precision, is_aligner=False)
+    align_files = get_model_filenames(enc_precision, is_aligner=True)
 
     asr_gguf = get_llm_filenames(llm_precision, is_aligner=False)
     align_gguf = get_llm_filenames(llm_precision, is_aligner=True)
@@ -156,7 +156,7 @@ def transcribe(
     config_table = Table(show_header=False, box=None)
     config_table.add_row("输出目录", f"[green]{out_dir or '源文件所在目录'}[/green]")
     config_table.add_row("模型目录", f"[green]{model_dir}[/green]")
-    config_table.add_row("编码器精度", f"[cyan]{precision}[/cyan]")
+    config_table.add_row("编码器精度", f"[cyan]{enc_precision}[/cyan]")
     config_table.add_row("解码器精度", f"[cyan]{llm_precision}[/cyan]")
     config_table.add_row("加速设备", f"ONNX:{onnx_provider} | LLM-GPU:{'[green]ON[/green]' if llm_use_gpu else '[red]OFF[/red]'} | Vulkan:{'[green]ON[/green]' if use_vulkan else '[red]OFF[/red]'}")
     config_table.add_row("时间戳对齐", f"{'[green]启用[/green]' if timestamp else '[red]禁用[/red]'}")

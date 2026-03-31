@@ -1,7 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
-from export_config import QUANTIZE_TYPE, EXPORT_DIR
+from export_config import LLM_QUANTIZE_TYPE, EXPORT_DIR
 
 # 设置路径
 PROJECT_ROOT = Path(__file__).parent.absolute()
@@ -9,7 +9,7 @@ QUANTIZE_EXE = PROJECT_ROOT / "qwen_asr_gguf" / "inference" / "bin" / "llama-qua
 
 MODEL_DIR = Path(EXPORT_DIR)
 INPUT_MODEL = MODEL_DIR / "qwen3_aligner_llm.f16.gguf"
-OUTPUT_MODEL = MODEL_DIR / f"qwen3_aligner_llm.{QUANTIZE_TYPE}.gguf"
+OUTPUT_MODEL = MODEL_DIR / f"qwen3_aligner_llm.{LLM_QUANTIZE_TYPE}.gguf"
 
 def main():
     print("---------------------------------------------------------")
@@ -26,19 +26,19 @@ def main():
 
     print(f"🔹 输入模型: {INPUT_MODEL.name}")
     print(f"🔹 输出模型: {OUTPUT_MODEL.name}")
-    print(f"🔹量化类型: {QUANTIZE_TYPE}")
+    print(f"🔹量化类型: {LLM_QUANTIZE_TYPE}")
 
     cmd = [
         str(QUANTIZE_EXE),
         str(INPUT_MODEL),
         str(OUTPUT_MODEL),
-        QUANTIZE_TYPE
+        LLM_QUANTIZE_TYPE
     ]
 
     print(f"\n🚀 正在启动 llama-quantize.exe...")
     try:
         subprocess.run(cmd, check=True)
-        print(f"\n✅ Aligner Decoder {QUANTIZE_TYPE} 量化成功！")
+        print(f"\n✅ Aligner Decoder {LLM_QUANTIZE_TYPE} 量化成功！")
         print(f"📁 产物保存在: {OUTPUT_MODEL}")
     except subprocess.CalledProcessError as e:
         print(f"\n❌ 量化失败，错误码: {e.returncode}")

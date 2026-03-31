@@ -10,7 +10,7 @@ sys.path.append(str(Path(__file__).parent.absolute()))
 
 from qwen_asr_gguf.inference import QwenASREngine, itn, load_audio, ASREngineConfig, AlignerConfig
 from qwen_asr_gguf.inference import exporters
-from export_config import QUANTIZE_TYPE, ENC_QUANTIZE_TYPE, EXPORT_DIR
+from export_config import LLM_QUANTIZE_TYPE, ENC_QUANTIZE_TYPE, EXPORT_DIR
 
 def main():
 
@@ -21,7 +21,7 @@ def main():
     config = ASREngineConfig(
         encoder_frontend_fn=f"qwen3_asr_encoder_frontend.{ENC_QUANTIZE_TYPE}.onnx",
         encoder_backend_fn=f"qwen3_asr_encoder_backend.{ENC_QUANTIZE_TYPE}.onnx",
-        llm_fn = f"qwen3_asr_llm.{QUANTIZE_TYPE}.gguf",
+        llm_fn = f"qwen3_asr_llm.{LLM_QUANTIZE_TYPE}.gguf",
         model_dir=EXPORT_DIR,
         onnx_provider = 'DML',
         llm_use_gpu = True,
@@ -32,7 +32,7 @@ def main():
             onnx_provider='DML',
             llm_use_gpu=True,
             model_dir=EXPORT_DIR,
-            llm_fn=f"qwen3_aligner_llm.{QUANTIZE_TYPE}.gguf"
+            llm_fn=f"qwen3_aligner_llm.{LLM_QUANTIZE_TYPE}.gguf"
         )
     )
 

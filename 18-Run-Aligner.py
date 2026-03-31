@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.absolute()))
 
 from qwen_asr_gguf.inference import QwenForcedAligner, load_audio, AlignerConfig
-from export_config import QUANTIZE_TYPE, ENC_QUANTIZE_TYPE, EXPORT_DIR
+from export_config import LLM_QUANTIZE_TYPE, ENC_QUANTIZE_TYPE, EXPORT_DIR
 
 def main():
     # 路径配置
@@ -30,7 +30,7 @@ def main():
         model_dir=model_dir,
         onnx_provider='DML',
         llm_use_gpu=True,
-        llm_fn=f"qwen3_aligner_llm.{QUANTIZE_TYPE}.gguf"
+        llm_fn=f"qwen3_aligner_llm.{LLM_QUANTIZE_TYPE}.gguf"
     )
     aligner = QwenForcedAligner(config=config)
 

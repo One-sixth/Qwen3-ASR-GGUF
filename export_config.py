@@ -13,10 +13,17 @@ ALIGNER_MODEL_DIR =  r'E:\Software\LLM\Qwen3-ForcedAligner-0.6B'
 # [导出目标路径] 转换后的 ONNX, GGUF 和权重汇总目录
 EXPORT_DIR = r'./model'
 
-# 量化输出的大小，默认是 q4_k
-# QUANTIZE_TYPE = "q4_k"
-QUANTIZE_TYPE = "q8_0"
-# QUANTIZE_TYPE = "f16"
+# LLM层 量化输出类型，默认是 q4_k
+# LLM_QUANTIZE_TYPE = "q4_k"
+# LLM_QUANTIZE_TYPE = "q6_k"
+LLM_QUANTIZE_TYPE = "q8_0"
+# LLM_QUANTIZE_TYPE = "f16"
+
+# 编码层 量化类型，默认是 int8
 # ENC_QUANTIZE_TYPE = "int4"
 ENC_QUANTIZE_TYPE = "int8"
 # ENC_QUANTIZE_TYPE = "fp16"
+
+
+assert LLM_QUANTIZE_TYPE in ('f16', 'q8_0', 'q6_k', 'q4_k'), "LLM_QUANTIZE_TYPE 必须是 f16, q8_0, q6_k, q4_k 中的一个"
+assert ENC_QUANTIZE_TYPE in ('fp16', 'int8', 'int4'), "ENC_QUANTIZE_TYPE 必须是 fp16, int8, int4 中的一个"

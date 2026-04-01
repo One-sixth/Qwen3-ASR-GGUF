@@ -39,7 +39,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=['build_hook.py'],
-    excludes=['torch', 'transformers', 'PySide6', 'shiboken6', 'pythonnet', 'apache_iotdb', 'IPython', 'pyarrow', 'scipy'],
+    excludes=['torch', 'transformers', 'PySide6', 'shiboken6', 'pythonnet', 'apache_iotdb', 'IPython', 'pyarrow', 'scipy', 'sqlalchemy', 'pandas'],
     noarchive=False,
     optimize=0,
 )

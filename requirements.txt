@@ -9,3 +9,4 @@ accelerate
 onnxscript
 srt
 sentencepiece
+loguru

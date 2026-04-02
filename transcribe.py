@@ -13,6 +13,13 @@ else:
     # 源码环境
     PROJ_DIR = Path(__file__).parent
 
+# ---------------------------------------------------------------
+# 设置默认的错误处理策略为 'ignore'，避免在控制台输出emoji时，编码转换失败，然后出现奇怪的乱码和报错
+# 该奇怪的问题出现在 pyinstaller 打包后的可执行文件中
+sys.stdin.reconfigure(encoding='utf8', errors='ignore')
+sys.stdout.reconfigure(encoding='utf8', errors='ignore')
+sys.stderr.reconfigure(encoding='utf8', errors='ignore')
+# ---------------------------------------------------------------
 
 import typer
 from rich.console import Console

@@ -190,7 +190,7 @@ pip install torch transformers==4.57.6
 > 
 > 依赖可能写得不是那么全，缺啥就装啥呗，没有需要自己编译的
 
-从 [llama.cpp Releases](https://github.com/ggml-org/llama.cpp/releases) 下载预编译二进制，将 DLL 放入 `qwen_asr_gguf/bin/`：
+从 [llama.cpp Releases](https://github.com/ggml-org/llama.cpp/releases) 下载预编译二进制，将 DLL 放入 `qwen_asr_gguf/inference/bin/`：
 
 | 平台 | 下载文件 |
 |------|----------|

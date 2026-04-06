@@ -1,1 +1,1 @@
-pyinstaller .\build.spec
+pyinstaller .\transcribe.spec

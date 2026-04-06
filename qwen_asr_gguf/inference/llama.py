@@ -10,13 +10,20 @@ import gguf
 from gguf.constants import GGML_QUANT_SIZES, GGMLQuantizationType
 from typing import List, Union, Set, Optional
 from pathlib import Path
-from os.path import relpath
 from . import logger
 
 # =========================================================================
 # Configuration
 # =========================================================================
 LOGS = True      # 是否在 logger 文件中记录 llama.cpp 的日志
+
+# 获取项目根目录 (适配打包环境)
+if getattr(sys, 'frozen', False):
+    # 打包环境：sys.executable 位于 dist/Project/ 根目录
+    lib_dir = Path(sys.executable).parent / 'llama_bin'
+else:
+    # 源码环境
+    lib_dir = Path(__file__).parent.parent.parent / 'llama_bin'
 
 # =========================================================================
 # Type Definitions
@@ -133,6 +140,7 @@ llama_get_logits_ith = None
 llama_get_embeddings = None
 llama_tokenize = None
 llama_vocab_n_tokens = None
+llama_vocab_bos = None
 llama_vocab_eos = None
 llama_token_to_piece = None
 llama_get_memory = None
@@ -157,7 +165,7 @@ llama_sampler_accept = None
 def logger_callback(level, message, user_data):
     """
     llama.cpp 日志回调函数
-    level: 
+    level:
         2 = ERROR
         3 = WARN
         4 = INFO
@@ -167,7 +175,7 @@ def logger_callback(level, message, user_data):
     try:
         msg_str = message.decode('utf-8', errors='replace').strip()
         if not msg_str or msg_str in ['.', '\n']: return
-        
+
         if level == 2:
             logger.error(f"[llama.cpp] {msg_str}")
         elif level == 3:
@@ -191,7 +199,7 @@ def configure_logging(logs=True):
         _log_callback_ref = LOG_CALLBACK(lambda l, m, u: None)
     llama_log_set(_log_callback_ref, None)
 
-def bind_llama_lib():
+def bind_llama_lib(lib_dir: str):
     """绑定 llama.cpp 库的 api"""
     global llama, ggml, ggml_base
     global llama_log_set, llama_backend_init, llama_backend_free
@@ -200,7 +208,7 @@ def bind_llama_lib():
     global llama_batch_init, llama_batch_free, llama_batch_get_one
     global llama_decode, llama_get_logits, llama_get_logits_ith, llama_get_embeddings, llama_tokenize
     global llama_get_memory, llama_memory_clear, llama_model_n_embd
-    global llama_vocab_n_tokens, llama_vocab_eos, llama_token_to_piece
+    global llama_vocab_n_tokens, llama_vocab_bos, llama_vocab_eos, llama_token_to_piece
     global llama_sampler_chain_default_params, llama_sampler_chain_init, llama_sampler_chain_add
     global llama_sampler_init_greedy, llama_sampler_init_dist, llama_sampler_init_temp
     global llama_sampler_init_top_k, llama_sampler_init_top_p, llama_sampler_sample, llama_sampler_free
@@ -212,7 +220,7 @@ def bind_llama_lib():
         return
 
     # 获取库文件所在目录 (模块目录下的 bin)
-    lib_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bin")
+    # lib_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bin")
 
     # DLL 命名处理
     if sys.platform == "win32":
@@ -296,7 +304,7 @@ def bind_llama_lib():
     llama_batch_free = llama.llama_batch_free
     llama_batch_free.argtypes = [llama_batch]
     llama_batch_free.restype = None
-    
+
     llama_batch_get_one = llama.llama_batch_get_one
     llama_batch_get_one.argtypes = [ctypes.POINTER(llama_token), ctypes.c_int32]
     llama_batch_get_one.restype = llama_batch
@@ -332,6 +340,10 @@ def bind_llama_lib():
     llama_vocab_n_tokens = llama.llama_vocab_n_tokens
     llama_vocab_n_tokens.argtypes = [ctypes.c_void_p]
     llama_vocab_n_tokens.restype = ctypes.c_int32
+
+    llama_vocab_bos = llama.llama_vocab_bos
+    llama_vocab_bos.argtypes = [ctypes.c_void_p]
+    llama_vocab_bos.restype = llama_token
 
     llama_vocab_eos = llama.llama_vocab_eos
     llama_vocab_eos.argtypes = [ctypes.c_void_p]
@@ -407,12 +419,14 @@ def bind_llama_lib():
     llama_sampler_accept.argtypes = [ctypes.c_void_p, llama_token]
     llama_sampler_accept.restype = None
 
+
 def init():
     """
     切换目录，初始化 llama.cpp lib
     """
     original_cwd = Path.cwd()
-    lib_dir = Path(__file__).parent / 'bin'
+    # lib_dir = Path(__file__).parent / 'bin'
+    # lib_dir = Path(__file__).parent.parent.parent / 'llama_bin'
 
     # 跳转到 dll 所在目录，并将其加到 Path
     os.chdir(lib_dir)
@@ -422,12 +436,12 @@ def init():
     logger.info(f"初始化 llama.cpp，跳转至：{Path.cwd()}")
 
     # 绑定 llama api
-    bind_llama_lib()
-    
+    bind_llama_lib(lib_dir)
+
     # 跳回到原来目录
     os.chdir(original_cwd)
     logger.info(f"恢复至目录：{Path.cwd()}")
-    
+
     return True
 
 init()
@@ -442,31 +456,32 @@ class LlamaModel:
     """模型的面向对象封装"""
     def __init__(self, path, n_gpu_layers=-1, use_gpu=1):
         self.ptr = self.load_model(path, n_gpu_layers=n_gpu_layers, use_gpu=use_gpu)
-            
+
         self.vocab = llama_model_get_vocab(self.ptr)
         self.n_embd = llama_model_n_embd(self.ptr)
+        self.bos_token = llama_vocab_bos(self.vocab)
         self.eos_token = llama_vocab_eos(self.vocab)
 
     def load_model(self, model_path: str, n_gpu_layers: int = -1, use_gpu: bool = 0):
         """
         加载 GGUF 模型（自动处理初始化和路径编码）
-        
+
         Args:
             model_path: GGUF 模型文件路径
             n_gpu_layers: 卸载到 GPU 的层数 (-1 表示全部)
             use_gpu: 是否启用 GPU (如果为 False，则强制使用 CPU)
-            
+
         Returns:
             model: llama_model 指针
         """
-        
+
         model_path = Path(model_path)
 
         model_params = llama_model_default_params()
         model_params.n_gpu_layers = n_gpu_layers
         if not use_gpu:
             model_params.devices = (ctypes.c_void_p * 1)(None)
-        
+
         model = llama_model_load_from_file(
             model_path.as_posix().encode('utf-8'),
             model_params
@@ -491,7 +506,7 @@ class LlamaModel:
     def token_to_bytes(self, token_id: int) -> bytes:
         """(Native) 单个 Token 转字节"""
         return token_to_bytes(self.vocab, token_id)
-        
+
     def token_to_piece(self, token_id: int) -> str:
         """(Native) 单个 Token 转字符串 Piece"""
         return self.token_to_bytes(token_id).decode('utf-8', errors='replace')
@@ -501,7 +516,7 @@ class LlamaModel:
 
     def token_eos(self) -> int:
         return llama_vocab_eos(self.vocab)
-        
+
     def token_to_id(self, text: str) -> int:
         """(Native) 单个 Token 字符串转 ID (仅限 Exact Match)"""
         # 利用 tokenize 来查找 ID
@@ -515,8 +530,8 @@ class LlamaModel:
 
 class LlamaContext:
     """上下文的面向对象封装"""
-    def __init__(self, model, n_ctx=2048, n_batch=2048, n_ubatch=512, n_seq_max=1, 
-                 embeddings=False, pooling_type=0, flash_attn=True, 
+    def __init__(self, model, n_ctx=2048, n_batch=2048, n_ubatch=512, n_seq_max=1,
+                 embeddings=False, pooling_type=0, flash_attn=True,
                  offload_kqv=True, no_perf=True, n_threads=None, n_threads_batch=None):
         self.model = model # 保持模型引用防止被释放
         params = llama_context_default_params()
@@ -529,7 +544,7 @@ class LlamaContext:
         params.flash_attn_type = 1 if flash_attn else 0
         params.offload_kqv = offload_kqv
         params.no_perf = no_perf
-        
+
         # 线程配置
         cpu_count = os.cpu_count() or 4
         if n_threads:
@@ -603,7 +618,7 @@ class LlamaBatch:
     def set_embd(self, data: np.ndarray, pos: Union[np.ndarray, int] = 0, seq_id: int = 0):
         """
         高阶接口：直接注入 Embedding 数据并初始化位置信息
-        
+
         Args:
             data: Embedding 数据 [n_tokens, dim]
             pos: 位置信息。
@@ -614,12 +629,12 @@ class LlamaBatch:
         n_tokens = data.shape[0]
         if n_tokens > self.n_tokens_max:
             raise ValueError(f"Batch 空间不足: {n_tokens} > {self.n_tokens_max}")
-        
+
         # 1. 内存移动 (Embedding)
         if not data.flags['C_CONTIGUOUS']:
             data = np.ascontiguousarray(data)
         ctypes.memmove(self.embd, data.ctypes.data, data.nbytes)
-        
+
         # 2. 位置信息处理 (Position)
         if isinstance(pos, int):
             # 自动生成线性位置
@@ -632,7 +647,7 @@ class LlamaBatch:
             # 但必须确保不超过 batch capacity
             if not pos.flags['C_CONTIGUOUS']:
                 pos = np.ascontiguousarray(pos)
-            
+
             # 使用 memmove 直接拷贝
             # self.pos 是 ctypes 指针，可以直接操作
             ctypes.memmove(self.pos, pos.ctypes.data, pos.nbytes)
@@ -645,7 +660,7 @@ class LlamaBatch:
             self.n_seq_id[i] = 1
             self.seq_id[i][0] = seq_id
             self.logits[i] = 1 if i == n_tokens - 1 else 0
-        
+
         return self
 
     def __del__(self):
@@ -664,26 +679,25 @@ def get_one_batch(token_id: int):
 class LlamaSampler:
     """采样器的面向对象封装"""
     def __init__(
-        self, 
-        temperature: float = 0.8, 
-        top_k: int = 50, 
-        top_p: float = 1.0, 
+        self,
+        temperature: float = 0.8,
+        top_k: int = 50,
+        top_p: float = 1.0,
         min_p: float = 0.0,
         repeat_penalty: float = 1.0,
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
         penalty_last_n: int = 64,
-        seed: Optional[int] = None, 
-        logit_bias: Optional[dict] = None, 
+        seed: Optional[int] = None,
+        logit_bias: Optional[dict] = None,
         n_vocab: int = 0
     ):
-        import time
         if seed is None:
             seed = int(time.time())
-            
+
         sparams = llama_sampler_chain_default_params()
         self.ptr = llama_sampler_chain_init(sparams)
-        
+
         # 1. Logit Bias (最高优先级)
         if logit_bias and n_vocab > 0 and isinstance(logit_bias, dict):
             n_bias = len(logit_bias)
@@ -710,7 +724,7 @@ class LlamaSampler:
                 llama_sampler_chain_add(self.ptr, llama_sampler_init_top_p(top_p, 1))
             if 0.0 < min_p < 1.0:
                 llama_sampler_chain_add(self.ptr, llama_sampler_init_min_p(min_p, 1))
-            
+
             llama_sampler_chain_add(self.ptr, llama_sampler_init_temp(temperature))
             llama_sampler_chain_add(self.ptr, llama_sampler_init_dist(seed))
         else:
@@ -726,16 +740,16 @@ class LlamaSampler:
     def sample(self, ctx, idx=-1, limit_start=None, limit_end=None, allow_tokens=None):
         """采样一个 Token，支持范围限制和白名单豁免"""
         ctx_ptr = ctx.ptr if hasattr(ctx, 'ptr') else ctx
-            
+
         # 处理 Logits 约束 (Range Limit + Allow-list)
         if (limit_start is not None or limit_end is not None) and hasattr(ctx, 'get_logits'):
             n_vocab = llama_vocab_n_tokens(ctx.model.vocab)
             logits_ptr = ctx.get_logits_ith(idx) # 获取指定索引的 logits
             logits = np.ctypeslib.as_array(logits_ptr, shape=(n_vocab,))
-            
+
             s = max(0, limit_start) if limit_start is not None else 0
             e = min(n_vocab, limit_end) if limit_end is not None else n_vocab
-            
+
             # 创建掩码：默认全灭，然后开启指定范围和白名单
             mask = np.ones(n_vocab, dtype=bool)
             mask[s:e] = False # 范围内的不抹除
@@ -743,9 +757,9 @@ class LlamaSampler:
                 for t in allow_tokens:
                     if 0 <= t < n_vocab:
                         mask[t] = False # 白名单内地不抹除
-            
+
             logits[mask] = self._neg_inf
-        
+
         # 使用原生 Chain 进行采样。
         # 注意：llama_sampler_sample 会自动对 Chain 调用 accept()。
         return llama_sampler_sample(self.ptr, ctx_ptr, idx)
@@ -782,12 +796,12 @@ class ASRStreamDecoder:
         text_piece = self.byte_decoder.decode(raw_bytes, final=False)
         self.tokens.append(text_piece)
         self.tokens_generated += 1
-        
+
         self.generated_text += text_piece
-        
+
         if self.reporter:
             self.reporter.stream(text_piece)
-            
+
         return text_piece
 
     def flush(self):
@@ -812,17 +826,17 @@ class LlamaEmbeddingTable:
     def __init__(self, raw_data, qtype):
         self.raw_data = raw_data
         self.qtype = qtype
-        
+
     def __len__(self):
         return self.raw_data.shape[0]
 
     def __getitem__(self, tokens):
         from gguf.quants import dequantize
-        
+
         # 如果是原生 float 类型，直接返回
         if self.raw_data.dtype in (np.float32, np.float16):
             return self.raw_data[tokens].astype(np.float32)
-            
+
         # 调用官方库进行高性能反量化
         return dequantize(self.raw_data[tokens], self.qtype.value)
 
@@ -857,12 +871,12 @@ def get_token_embeddings_gguf(model_path, target_tensor="token_embd.weight"):
     """
     t_start = time.time()
     mm = np.memmap(model_path, mode='r')
-    
+
     # 获取文件头信息
     tensor_count, kv_count = struct.unpack_from("<QQ", mm, 8)
     offs = 24
     alignment = 32
-    
+
     # 光速跃过/扫描所有 KV 字段
     for _ in range(kv_count):
         key_len = struct.unpack_from("<Q", mm, offs)[0]
@@ -877,16 +891,16 @@ def get_token_embeddings_gguf(model_path, target_tensor="token_embd.weight"):
                 continue
         else:
             offs += key_len
-            
+
         v_type = struct.unpack_from("<I", mm, offs)[0]
         offs += 4
         offs = _skip_gguf_value(mm, offs, v_type)
-        
+
     # 扫描 Tensor Infos 搜寻我们想要的张量
     target_rel_offset = None
     target_type = None
     target_shape = None # GGUF shape 是倒序的 [n_embd, vocab_size]
-    
+
     target_bytes = target_tensor.encode('utf-8')
     for _ in range(tensor_count):
         name_len = struct.unpack_from("<Q", mm, offs)[0]
@@ -895,38 +909,38 @@ def get_token_embeddings_gguf(model_path, target_tensor="token_embd.weight"):
         if name_len == len(target_bytes) and mm[offs:offs+name_len].tobytes() == target_bytes:
             is_target = True
         offs += name_len
-        
+
         n_dims = struct.unpack_from("<I", mm, offs)[0]
         offs += 4
-        
+
         shape = struct.unpack_from(f"<{n_dims}Q", mm, offs) # 返回元组
         offs += 8 * n_dims
-        
+
         t_type = struct.unpack_from("<I", mm, offs)[0]
         offs += 4
-        
+
         rel_offset = struct.unpack_from("<Q", mm, offs)[0]
         offs += 8
-        
+
         if is_target:
             target_shape = shape
             target_type = t_type
             target_rel_offset = rel_offset
-            
+
     # 计算数据区起始点并加载张量
     padding = offs % alignment
     if padding != 0:
         offs += (alignment - padding)
     data_offset = offs
-    
+
     if target_shape is None:
         logger.error(f"无法在 {model_path} 中找到 {target_tensor}")
         return None
-        
+
     abs_offset = data_offset + target_rel_offset
     n_embd = target_shape[0]     # 特征维度
     vocab_size = target_shape[1] # 词表大小
-    
+
     qtype = GGMLQuantizationType(target_type)
     if qtype in GGML_QUANT_SIZES:
         block_size, type_size = GGML_QUANT_SIZES[qtype]
@@ -942,7 +956,7 @@ def get_token_embeddings_gguf(model_path, target_tensor="token_embd.weight"):
 
     total_bytes = vocab_size * bytes_per_row
     raw_data = mm[abs_offset : abs_offset + total_bytes]
-    
+
     if qtype in (GGMLQuantizationType.F32, GGMLQuantizationType.F16):
         if qtype == GGMLQuantizationType.F32:
             raw_data = raw_data.view(np.float32).reshape(vocab_size, n_embd)
@@ -950,11 +964,11 @@ def get_token_embeddings_gguf(model_path, target_tensor="token_embd.weight"):
             raw_data = raw_data.view(np.float16).reshape(vocab_size, n_embd)
     else:
         raw_data = raw_data.reshape(vocab_size, bytes_per_row)
-        
+
     total_time = time.time() - t_start
     logger.info(f"--- [QwenASR] 已极速载入 Embedding 视图 ({total_time*1000:.1f}ms) ---")
     logger.info(f"    - 量化格式: {qtype.name} ({n_embd} dims, {vocab_size} tokens)")
-    
+
     return LlamaEmbeddingTable(raw_data, qtype)
 
 

@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, List, Optional
-import numpy as np
+
 
 class MsgType(Enum):
     CMD_ENCODE = auto()   # 主进程 -> Encoder: 编码请求
@@ -66,8 +66,8 @@ class AlignerConfig:
     # 拆分为 Frontend 和 Backend
     encoder_frontend_fn: str = "qwen3_aligner_encoder_frontend.int4.onnx"
     encoder_backend_fn: str = "qwen3_aligner_encoder_backend.int4.onnx"
-    
-    llm_fn: str = "qwen3_aligner_llm.q4_k.gguf" 
+
+    llm_fn: str = "qwen3_aligner_llm.q4_k.gguf"
     onnx_provider: str = 'CPU'  # CPU, CUDA, DML, TensorRT
     llm_use_gpu: bool = True
     n_ctx: int = 2048       # 对于 Aligner Decoder，每秒音频+文字，约占 30 个 token
@@ -95,7 +95,7 @@ class ASREngineConfig:
         # 如果没有显式设置 Encoder 填充时长，则默认与 LLM 分段识别时长对齐
         if self.dml_pad_to is None:
             object.__setattr__(self, 'pad_to', int(self.chunk_size))
-            
+
         if self.align_config is None:
             object.__setattr__(self, 'align_config', AlignerConfig(
                 model_dir=self.model_dir,

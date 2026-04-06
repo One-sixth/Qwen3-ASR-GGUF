@@ -1,7 +1,5 @@
 # coding=utf-8
-import os
-import sys
-import time
+import os, sys, time
 from pathlib import Path
 from typing import List, Optional
 
@@ -25,8 +23,6 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
-from rich import print as rprint
 
 from qwen_asr_gguf.inference import QwenASREngine, ASREngineConfig, AlignerConfig, exporters
 
@@ -36,6 +32,7 @@ from export_config import LLM_QUANTIZE_TYPE, ENC_QUANTIZE_TYPE
 app = typer.Typer(help="Qwen3-ASR GGUF 命令行转录工具", add_completion=False)
 console = Console()
 
+
 def get_model_filenames(precision: str, is_aligner: bool = False):
     """根据精度返回对应的模型文件名"""
     prefix = "qwen3_aligner" if is_aligner else "qwen3_asr"
@@ -44,10 +41,12 @@ def get_model_filenames(precision: str, is_aligner: bool = False):
         "backend": f"{prefix}_encoder_backend.{precision}.onnx"
     }
 
+
 def get_llm_filenames(precision: str, is_aligner: bool = False):
     """根据精度返回对应的模型文件名"""
     prefix = "qwen3_aligner" if is_aligner else "qwen3_asr"
     return f"{prefix}_llm.{precision}.gguf"
+
 
 def check_model_files(config: ASREngineConfig):
     """检查模型文件完整性"""
@@ -80,6 +79,7 @@ def check_model_files(config: ASREngineConfig):
         console.print("[blue]https://github.com/HaujetZhao/Qwen3-ASR-GGUF/releases/tag/models[/blue]\n")
         raise typer.Exit(code=1)
 
+
 @app.command()
 def transcribe(
     files: List[Path] = typer.Argument(..., help="要转录的音频文件列表"),
@@ -100,9 +100,17 @@ def transcribe(
     context: str = typer.Option("", "--context", "-ctx", help="上下文提示词 (Prompt)", rich_help_panel="转录设置"),
     temperature: float = typer.Option(0.6, "--temperature", help="采样温度", rich_help_panel="转录设置"),
 
-
     seek_start: float = typer.Option(0.0, "--seek-start", "-ss", help="音频开始位置 (秒)", rich_help_panel="音频切片"),
     duration: Optional[float] = typer.Option(None, "--duration", "-t", help="处理音频的时长 (秒)", rich_help_panel="音频切片"),
+
+    # 组 2.1：额外的解码配置
+    top_k: int = typer.Option(20, "--top-k", help="仅保留概率最高的top_k个token，其余token概率置零，再重新归一化", rich_help_panel="额外解码设定"),
+    top_p: float = typer.Option(0.95, "--top-p", help="Nucleus Sampling，从概率最高的token开始累加，直到累计概率超过top_p，然后仅在此'核心'集合中采样", rich_help_panel="额外解码设定"),
+    min_p: float = typer.Option(0.05, "--min-p", help="相对阈值过滤。移除所有概率低于 max_prob * min_p 的 token（max_prob 是当前最高概率 token 的概率）", rich_help_panel="额外解码设定"),
+    repeat_penalty: float = typer.Option(1.0, "--repeat-penalty", help="若 token 已出现在最近的 penalty_last_n 序列中，其logit除以 repeat_penalty", rich_help_panel="额外解码设定"),
+    frequency_penalty: float = typer.Option(0.02, "--frequency-penalty", help="token 在序列中出现的次数越多，惩罚就越多。logit=logit-frequency_penalty*count", rich_help_panel="额外解码设定"),
+    presence_penalty: float = typer.Option(0.0, "--presence-penalty", help="当token在序列中出现过一次就施加一个固定惩罚，该惩罚固定的，不会随次数增加而增加。logit=logit-presence_penalty*occurred（occurred为0或1）", rich_help_panel="额外解码设定"),
+    penalty_last_n: int = typer.Option(20, "--penalty-last-n", help="只考虑最近生成的 penalty_last_n 个 token 来计算惩罚", rich_help_panel="额外解码设定"),
 
     # 组 3: 音频裁剪与性能
     chunk_size: float = typer.Option(40.0, "--chunk-size", "-c", help="分段识别时长 (秒)", rich_help_panel="流式配置"),
@@ -159,6 +167,16 @@ def transcribe(
         verbose=verbose
     )
 
+    decode_other_kwargs = {
+        "top_k": top_k,
+        "top_p": top_p,
+        "min_p": min_p,
+        "repeat_penalty": repeat_penalty,
+        "frequency_penalty": frequency_penalty,
+        "presence_penalty": presence_penalty,
+        "penalty_last_n": penalty_last_n,
+    }
+
     # 3. 打印配置面板
     config_table = Table(show_header=False, box=None)
     config_table.add_row("输出目录", f"[green]{out_dir or '源文件所在目录'}[/green]")
@@ -178,7 +196,7 @@ def transcribe(
     with console.status("[bold yellow]正在初始化引擎，请稍候...[/bold yellow]") as status:
         try:
             t0 = time.time()
-            engine = QwenASREngine(config=config)
+            engine = QwenASREngine(config=config, decode_other_kwargs=decode_other_kwargs)
             init_duration = time.time() - t0
             console.print(f"--- [QwenASR] 引擎初始化耗时: {init_duration:.2f} 秒 ---")
         except Exception as e:
@@ -207,10 +225,6 @@ def transcribe(
             base_out.parent.mkdir(parents=True, exist_ok=True)
 
             txt_out = f"{base_out}.txt"
-            # if Path(txt_out).exists() and not yes:
-            #     if not typer.confirm(f"文件 {txt_out} 已存在，是否覆盖?"):
-            #         console.print("[yellow]已跳过。[/yellow]")
-            #         continue
 
             res = engine.transcribe(
                 audio_file=str(audio_path),

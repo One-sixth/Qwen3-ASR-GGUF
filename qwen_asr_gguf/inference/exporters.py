@@ -4,8 +4,10 @@ from datetime import timedelta
 from typing import List, Optional
 import srt
 import json
+import shutil
 from .schema import ForcedAlignResult, ForcedAlignItem, TranscribeResult
 from .chinese_itn import chinese_to_num as itn
+
 
 def alignment_to_srt(items: Optional[List[ForcedAlignItem]], max_chars: int = 40) -> str:
     """
@@ -18,21 +20,21 @@ def alignment_to_srt(items: Optional[List[ForcedAlignItem]], max_chars: int = 40
     subtitles = []
     current_texts = []
     start_time = None
-    
+
     # 匹配分割符号：中文全角标点、英文半角标点、以及可能存在的换行符
     # 特别注意：在有的 ASR 引擎中，标点后可能跟有空格，也一并匹配
     split_pattern = re.compile(r'[，。？！、\n]|[,.?!]\s*')
-    
+
     for item in items:
         # 记录每一行字幕的开始时间
         if start_time is None:
             start_time = item.start_time
-        
+
         current_texts.append(item.text)
-        
+
         # 聚合当前已有的文本
         current_content = "".join(current_texts)
-        
+
         # 触发分割的条件：
         # 1. 遇到了分割标点符号
         # 2. 或者当前行字符数超过了 max_chars (防止单行过长)
@@ -51,7 +53,7 @@ def alignment_to_srt(items: Optional[List[ForcedAlignItem]], max_chars: int = 40
                 ))
             current_texts = []
             start_time = None
-            
+
     # 处理末尾残余文本
     if current_texts:
         content = "".join(current_texts).strip()
@@ -67,7 +69,7 @@ def alignment_to_srt(items: Optional[List[ForcedAlignItem]], max_chars: int = 40
                 end=timedelta(seconds=end_time),
                 content=itn_content
             ))
-            
+
     return srt.compose(subtitles)
 
 def alignment_to_json(items: Optional[List[ForcedAlignItem]]) -> List[dict]:
@@ -88,10 +90,14 @@ def export_to_srt(path: str, result: TranscribeResult):
     if not result.alignment:
         with open(path, "w", encoding="utf-8") as f: f.write("")
         return
-    
+
     content = alignment_to_srt(result.alignment.items)
-    with open(path, "w", encoding="utf-8") as f:
+
+    # 使用原子保存
+    tmp_path = str(path) + '.tmp'
+    with open(tmp_path, "w", encoding="utf-8") as f:
         f.write(content)
+    shutil.move(tmp_path, path)
     print(f"✅ 已生成字幕文件: {path}")
 
 def export_to_json(path: str, result: TranscribeResult):
@@ -101,8 +107,12 @@ def export_to_json(path: str, result: TranscribeResult):
         return
 
     data = alignment_to_json(result.alignment.items)
-    with open(path, "w", encoding="utf-8") as f:
+
+    # 使用原子保存
+    tmp_path = str(path) + '.tmp'
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    shutil.move(tmp_path, path)
     print(f"✅ 已导出时间戳: {path}")
 
 def export_to_txt(path: str, result: TranscribeResult):
@@ -113,7 +123,10 @@ def export_to_txt(path: str, result: TranscribeResult):
     formatted_text = re.sub(r'([，。？！：])', r'\1\n', final_text)
     # 3. 对于英文字母后面的逗号空格、句号空格，也要换行
     formatted_text = re.sub(r'(?<=[a-zA-Z])([,\.] )', r'\1\n', formatted_text)
-    
-    with open(path, "w", encoding="utf-8") as f:
+
+    # 使用原子保存
+    tmp_path = str(path) + '.tmp'
+    with open(tmp_path, "w", encoding="utf-8") as f:
         f.write(formatted_text)
+    shutil.move(tmp_path, path)
     print(f"✅ 已保存文本文件: {path}")

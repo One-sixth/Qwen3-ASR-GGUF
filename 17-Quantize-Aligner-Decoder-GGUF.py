@@ -5,7 +5,7 @@ from export_config import LLM_QUANTIZE_TYPE, EXPORT_DIR
 
 # 设置路径
 PROJECT_ROOT = Path(__file__).parent.absolute()
-QUANTIZE_EXE = PROJECT_ROOT / "qwen_asr_gguf" / "inference" / "bin" / "llama-quantize.exe"
+QUANTIZE_EXE = PROJECT_ROOT / "llama_bin" / "llama-quantize.exe"
 
 MODEL_DIR = Path(EXPORT_DIR)
 INPUT_MODEL = MODEL_DIR / "qwen3_aligner_llm.f16.gguf"

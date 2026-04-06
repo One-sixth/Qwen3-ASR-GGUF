@@ -1,9 +1,9 @@
 *.log
-model/*.onnx
-model/*.gguf
-model/*.pt
-model/*.bin
-model/*.lib
+model/**/*.onnx
+model/**/*.gguf
+model/**/*.pt
+model/**/*.bin
+model/**/*.lib
 qwen_asr_gguf/inference/bin
 llama_bin/*.exe
 llama_bin/*.dll

@@ -1,11 +1,16 @@
+'''
+[模型导出配置]
+'''
 
 from pathlib import Path
-model_home = Path('~/.cache/modelscope/hub/models/Qwen').expanduser()
 
-
-# [源模型路径] 官方下载好的 SafeTensors 模型文件夹
+# [源模型路径] 官方默认下载的 SafeTensors 模型文件夹
+# model_home = Path('~/.cache/modelscope/hub/models/Qwen').expanduser()
+# ASR_MODEL_DIR =  model_home / 'Qwen3-ASR-0.6B'
 # ASR_MODEL_DIR =  model_home / 'Qwen3-ASR-1.7B'
 # ALIGNER_MODEL_DIR =  model_home / 'Qwen3-ForcedAligner-0.6B'
+
+# 本地权重路径设定，如果放在其他地方。
 ASR_MODEL_DIR =  r'E:\Software\LLM\Qwen3-ASR-1.7B'
 # ASR_MODEL_DIR =  r'E:\Software\LLM\Qwen3-ASR-0.6B'
 ALIGNER_MODEL_DIR =  r'E:\Software\LLM\Qwen3-ForcedAligner-0.6B'

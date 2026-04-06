@@ -51,7 +51,6 @@ def main():
         duration=40
     )
 
-
     # 导出文本（每行一句）
     txt_path = str(Path(audio_path).with_suffix('.txt'))
     exporters.export_to_txt(txt_path, res)

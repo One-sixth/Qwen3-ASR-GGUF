@@ -178,19 +178,13 @@ CPU 的速度：
 
 ### 1. 安装依赖
 
-```bash
-pip install onnxruntime-directml pydub numpy scipy gguf srt
-```
-
-转换格式还需要：
-
-```bash
-pip install torch transformers==4.57.6
+```shell
+pip install requirements.txt
 ```
 
 > 依赖可能写得不是那么全，缺啥就装啥呗，没有需要自己编译的
 
-从 [llama.cpp Releases](https://github.com/ggml-org/llama.cpp/releases) 下载预编译二进制，将 DLL 放入 `qwen_asr_gguf/inference/bin/`：
+从 [llama.cpp Releases](https://github.com/ggml-org/llama.cpp/releases) 下载预编译二进制，将 里面的 EXE 和 DLL 放入 `llama_bin` 文件夹中：
 
 | 平台 | 下载文件 |
 |------|----------|
@@ -223,19 +217,25 @@ Aligner 模型是 0.6B 的。
 
 ```bash
 pip install modelscope
-modelscope download --model Qwen/Qwen3-ASR-0.6B
-modelscope download --model Qwen/Qwen3-ForcedAligner-0.6B
+modelscope download --model Qwen/Qwen3-ASR-0.6B --local_dir Qwen3-ASR-0.6B
+modelscope download --model Qwen/Qwen3-ForcedAligner-0.6B --local_dir Qwen3-ForcedAligner-0.6B
 ```
 
-配置 `export_config.py`，定义官方模型路径、导出路径：
+修改文件 `export_config.py`，填入下载官方模型路径：
+ASR_MODEL_DIR 填入 Qwen3-ASR-0.6B 的本地路径
+ALIGNER_MODEL_DIR 填入 Qwen3-ForcedAligner-0.6B 的本地路径
+EXPORT_DIR 填入导出模型的路径，建议保持默认
+
+LLM_QUANTIZE_TYPE 填入要量化的类型，建议是 q8_0
+ENC_QUANTIZE_TYPE 填入要量化的类型，建议是 int8
 
 ```python
 from pathlib import Path
 model_home = Path('~/.cache/modelscope/hub/models/Qwen').expanduser()
 
 # [源模型路径] 官方下载好的 SafeTensors 模型文件夹
-ASR_MODEL_DIR =  model_home / 'Qwen3-ASR-0.6B'
-ALIGNER_MODEL_DIR =  model_home / 'Qwen3-ForcedAligner-0.6B'
+ASR_MODEL_DIR =  r'E:\LLM\Model\Qwen3-ASR-0.6B'
+ALIGNER_MODEL_DIR =  r'E:\LLM\Model\Qwen3-ForcedAligner-0.6B'
 
 # [导出目标路径] 转换后的 ONNX, GGUF 和权重汇总目录
 EXPORT_DIR = r'./model'
@@ -270,10 +270,10 @@ python 17-Quantize-Aligner-Decoder-GGUF.py
 
 ```bash
 # 基本用法
-python transcribe.py test.mp3
+python transcribe.py test_audio/asr_zh.aac
 
 # 添加参数，如禁用 dml
-python transcribe.py test.mp3 --prec int4 --no-dml --no-vulkan --n-ctx 4096
+python transcribe.py test_audio/asr_zh.aac --prec int4 --no-dml --no-vulkan --n-ctx 4096
 ```
 
 也可以参考 `21-Run-ASR.py` 在 Python 代码中调用：
@@ -302,6 +302,11 @@ config = ASREngineConfig(
 
 # 初始化引擎
 engine = QwenASREngine(config=config)
+
+# 媒体文件，可以音频也可以是视频
+audio_path = 'test_audio/asr_zh.aac'
+# 上下文提示，可以提示模型这段音频是什么类型的，例如：这是一个播客的音频，或者这是一个会议的音频等
+context = '这是一个播客的音频'
 
 # 执行转录
 res = engine.transcribe(
@@ -354,6 +359,7 @@ graph TD
 ├── 18-Run-Aligner.py                        # Aligner 对齐 API 示例脚本
 ├── 21-Run-ASR.py                            # ASR 转录 API 示例脚本
 ├── transcribe.py                            # 命令行转录工具 (功能最全)
+├── build_standalone.bat                     # 构建独立可执行文件 (Windows)
 └── qwen_asr_gguf/
     └── inference/
         ├── asr.py                  # ASR 核心引擎逻辑
@@ -379,5 +385,6 @@ os.environ["GGML_VK_DISABLE_F16"] = "1"
 
 ## 致谢
 
+- [Qwen3-ASR-GGUF](https://github.com/HaujetZhao/Qwen3-ASR-GGUF) - GGUF 模型转换
 - [Qwen3-ASR](https://www.modelscope.cn/collections/Qwen/Qwen3-ASR) - 原始模型
 - [llama.cpp](https://github.com/ggml-org/llama.cpp) - GGUF 推理引擎

@@ -10,6 +10,7 @@ llama_bin/*.dll
 llama_bin/*.so
 llama_bin/*.lib
 llama_bin/*.bin
+.run/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

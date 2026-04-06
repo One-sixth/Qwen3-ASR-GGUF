@@ -1,13 +1,18 @@
 # Qwen3-ASR GGUF
 
-将 [Qwen3-ASR](https://www.modelscope.cn/collections/Qwen/Qwen3-ASR) 模型转换为可本地高效运行的混合格式，实现**快速、准确的离线语音识别**。
+# 基于 原项目 [Qwen3-ASR-GGUF](https://github.com/HaujetZhao/Qwen3-ASR-GGUF) 改造的个人修改版本
 
-主要依赖 [llama.cpp](https://github.com/ggml-org/llama.cpp) 加速 LLM Decoder。
+# 项目介绍
 
-Qwen3-ASR 0.6B 与 Qwen3-ASR 1.7B 以及 Qwen3-ForceAligner 0.6B 均可用。
+    将 [Qwen3-ASR](https://www.modelscope.cn/collections/Qwen/Qwen3-ASR) 模型转换为可本地高效运行的混合格式，实现**快速、准确的离线语音识别**。
+    主要依赖 [llama.cpp](https://github.com/ggml-org/llama.cpp) 加速 LLM Decoder。
+    Qwen3-ASR 0.6B 与 Qwen3-ASR 1.7B 以及 Qwen3-ForceAligner 0.6B 均可用。
+    建议使用 1.7B 模型，转写的错误率低很多。
 
-建议使用 1.7B 模型，转写的错误率低很多。
-
+    注意，当前默认是 int8 和 q8_0 量化权重。
+    如果要用其它精度，例如 int4，q4_k，需要设定参数 --llm-prec q4_k 和 --enc-prec int4 。
+    这将会使用 int4 和 q4 权重的量化权重。
+    当前 int8 和 q8_k 量化下，ASR-1.7B + Align-0.6B 权重，llama-cpp-cuda 推理时大约占用 4.5GB 显存 和 4G 内存。
 
 ### 命令行
 
@@ -399,6 +404,6 @@ os.environ["GGML_VK_DISABLE_F16"] = "1"
 
 ## 致谢
 
-- [Qwen3-ASR-GGUF](https://github.com/HaujetZhao/Qwen3-ASR-GGUF) - GGUF 模型转换
+- [Qwen3-ASR-GGUF](https://github.com/HaujetZhao/Qwen3-ASR-GGUF) - 原项目，打通GGUF模型转换和高速推理
 - [Qwen3-ASR](https://www.modelscope.cn/collections/Qwen/Qwen3-ASR) - 原始模型
 - [llama.cpp](https://github.com/ggml-org/llama.cpp) - GGUF 推理引擎

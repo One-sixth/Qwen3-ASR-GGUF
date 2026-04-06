@@ -358,6 +358,12 @@ graph TD
 - **DML 形状固定优化**: 推理时将音频填充（Padding）到固定长度（如 40s），并配合 Attention Mask。这解决了 DirectML 在处理动态形状时频繁分配显存导致的性能抖动，显著提升了推理速度。
 
 
+## 如何构建转录程序 transcribe.py 独立可执行文件
+
+运行以下命令即可，构建完成的可执行文件会在 `dist/` 目录下。
+
+pyinstaller .\transcribe.spec
+
 ## 项目结构
 
 ```bash

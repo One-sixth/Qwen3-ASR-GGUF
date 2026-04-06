@@ -4,7 +4,9 @@
 
 主要依赖 [llama.cpp](https://github.com/ggml-org/llama.cpp) 加速 LLM Decoder。
 
-Qwen3-ASR 0.6B 与 Qwen3-ASR 1.7B 以及 Qwen3-ForceAligner 0.6B 均可用，
+Qwen3-ASR 0.6B 与 Qwen3-ASR 1.7B 以及 Qwen3-ForceAligner 0.6B 均可用。
+
+建议使用 1.7B 模型，转写的错误率低很多。
 
 
 ### 命令行
@@ -193,7 +195,19 @@ pip install requirements.txt
 ### 2. 下载模型
 
 
-#### 2.1 下载模型
+#### 2.0 量化权重放置的位置
+
+model/qwen3_asr_llm.q8_0.gguf
+model/qwen3_asr_encoder_frontend.int8
+model/qwen3_asr_encoder_backend.int8.onnx
+model/qwen3_aligner_llm.q8_0.gguf
+model/qwen3_aligner_encoder_frontend.int8.onnx
+model/qwen3_aligner_encoder_backend.int8.onnx
+
+其中 qwen3_asr_ 开头的，可以是 0.6B 或 1.7B 的ASR模型，它们名字相同。
+qwen3_aligner_ 开头的，是 0.6B 的对齐模型。
+
+#### 2.1 下载现成的量化权重
 
 到 [Models Release](https://github.com/HaujetZhao/Qwen3-ASR-GGUF/releases/tag/models) 下载已经转换好的模型打包文件，下载后解压到 `model` 文件夹。
 
@@ -211,11 +225,11 @@ Aligner 模型是 0.6B 的。
 如果执意要用其它精度（fp32、fp16、int8）可以自行手动导出。
 
 
-#### 2.2 手动导出
+#### 2.2 手动导出量化权重
 
 下载原始模型：
 
-```bash
+```shell
 pip install modelscope
 modelscope download --model Qwen/Qwen3-ASR-0.6B --local_dir Qwen3-ASR-0.6B
 modelscope download --model Qwen/Qwen3-ForcedAligner-0.6B --local_dir Qwen3-ForcedAligner-0.6B
@@ -244,7 +258,7 @@ EXPORT_DIR = r'./model'
 
 导出模型：
 
-```bash
+```shell
 # === 1. ASR 模型导出流程 ===
 python 01-Export-ASR-Encoder-Frontend.py     # 导出 Encoder 前段 (CNN)
 python 02-Export_ASR-Encoder-Backend.py      # 导出 Encoder 后段 (Transformer)
@@ -268,7 +282,7 @@ python 17-Quantize-Aligner-Decoder-GGUF.py
 
 推荐使用 `transcribe.py` 命令行工具进行转录，支持丰富的参数配置：
 
-```bash
+```shell
 # 基本用法
 python transcribe.py test_audio/asr_zh.aac
 
@@ -278,7 +292,7 @@ python transcribe.py test_audio/asr_zh.aac --prec int4 --no-dml --no-vulkan --n-
 
 也可以参考 `21-Run-ASR.py` 在 Python 代码中调用：
 
-```bash
+```shell
 python 21-Run-ASR.py
 ```
 

@@ -1,6 +1,15 @@
 *.log
-model/
+model/*.onnx
+model/*.gguf
+model/*.pt
+model/*.bin
+model/*.lib
 qwen_asr_gguf/inference/bin
+llama_bin/*.exe
+llama_bin/*.dll
+llama_bin/*.so
+llama_bin/*.lib
+llama_bin/*.bin
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
